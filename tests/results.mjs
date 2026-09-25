@@ -1,0 +1,32 @@
+import ts from 'typescript';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const dir=await fs.mkdtemp(path.join(os.tmpdir(),'school-results-'));
+for(const name of ['model','metrics','results','actions']){
+ const src=await fs.readFile(`lib/school/${name}.ts`,'utf8');
+ await fs.writeFile(path.join(dir,name+'.mjs'),ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace(/(['"])\.\/(model|metrics|results)\1/g,'"./$2.mjs"'));
+}
+const {newSchool,projectSchool}=await import(path.join(dir,'model.mjs'));
+const {applyAction}=await import(path.join(dir,'actions.mjs'));
+const s=newSchool('school-a','owner',{});s.status='Active';s.currentYear='y';s.years=[{id:'y',start:'2026-06-01',end:'2027-05-31'}];s.classes=[{id:'c',name:'5',division:'A'}];s.subjects=[{id:'math',name:'Math'}];s.teachers=[{id:'t',status:'Active'}];s.assignments=[{teacherId:'t',classId:'c',subjectId:'math'}];s.students=['one','two','three'].map((id,i)=>({id,status:'Active',parentEmail:'parent@example.com',enrollments:[{yearId:'y',classId:'c',rollNumber:String(i+1)}]}));
+const admin={role:'admin',userId:'admin',name:'Admin',email:'admin@example.com'},teacher={role:'teacher',teacherId:'t',userId:'t',name:'Teacher',email:'t@example.com'};
+const run=(a,op,p)=>applyAction(s,a,op,p);
+run(admin,'examCreate',{name:'Unit Test',yearId:'y',classId:'c',subjects:[{subjectId:'math',max:40,pass:14}]});const exam=s.exams[0];
+const p={examId:exam.id,subjectId:'math',records:[{studentId:'one',status:'Marked',marks:0},{studentId:'two',status:'Marked',marks:38},{studentId:'three',status:'Absent'}]};
+assert.throws(()=>run({...teacher,teacherId:'other'},'marksSave',p),/not assigned/);
+assert.throws(()=>run(teacher,'marksSave',{...p,records:[{studentId:'one',status:'Marked',marks:41}]}),/between/);
+assert.equal(s.markSheets.length,0);
+run(teacher,'marksSave',{...p,records:[{studentId:'one',status:'Blank'}]});assert.equal(s.markSheets[0].records[0].marks,null);
+assert.throws(()=>run(teacher,'marksSave',{...p,submit:true,records:[]}),/every student/);
+assert.throws(()=>run(admin,'examPublish',{examId:exam.id}),/Approve every subject/);
+run(teacher,'marksSave',{...p,submit:true});assert.equal(s.markSheets[0].records[0].marks,0);
+assert.throws(()=>run(teacher,'marksSave',p),/locked/);
+assert.throws(()=>run(teacher,'marksReview',{...p,status:'Approved'}),/Only School Admin/);
+run(admin,'marksReview',{...p,status:'Returned',reason:'Verify marks'});run(teacher,'marksSave',{...p,submit:true});run(admin,'marksReview',{...p,status:'Approved'});
+const parent={role:'parent',userId:'p',parentId:'p',parentGoogle:true,name:'Parent',email:'parent@example.com'};s.links=[{userId:'p',studentId:'one',method:'google-dob'}];
+assert.equal(projectSchool(s,parent).exams.length,0);run(admin,'examPublish',{examId:exam.id});const view=projectSchool(s,parent);assert.equal(view.exams.length,1);assert.deepEqual(view.exams[0].studentIds,['one']);assert.deepEqual(view.markSheets[0].records.map(r=>r.studentId),['one']);assert.equal(projectSchool(s,{...parent,parentId:'stranger'}).markSheets.length,0);
+assert.throws(()=>run(admin,'marksSave',p),/locked/);assert.equal(projectSchool(s,{...admin,role:'platform'}).markSheets,undefined);
+s.status='Suspended';assert.throws(()=>run(admin,'examCreate',{}),/not active/);
+console.log('PASS results: setup, drafts, zero/blank/absence, validation, assignment security, approval, publication lock, parent isolation and suspension.');

@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789449765436,
+      "tag": "0000_productive_riptide",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789541116760,
+      "tag": "0001_black_kid_colt",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789570150482,
+      "tag": "0002_warm_reavers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789657810765,
+      "tag": "0003_single_school_admin_reset",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789975897224,
+      "tag": "0004_nostalgic_ultimates",
+      "breakpoints": true
+    }
+  ]
+}
